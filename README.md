@@ -1,7 +1,7 @@
 
 # Legal Research AI Assistant
 
-An agentic AI mini-project developed as part of my second-year project seminar at IIT Bhubaneswar.
+An agentic AI mini-project developed as part of my second-year project seminar course at IIT Bhubaneswar.
 
 The project implements a multi-agent legal research workflow:
 
