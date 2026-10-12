@@ -120,57 +120,69 @@ def run_async(coro):
     return asyncio.run(coro)
 
 
-st.set_page_config(page_title="Legal Research AI Assistant", page_icon="⚖️", layout="centered")
+st.set_page_config(
+    page_title="Legal Research AI Assistant",
+    layout="centered",
+)
 
-st.title("⚖️ Legal Research AI Assistant")
-st.caption("Agentic Workflow (Retrieval → Formulation → Verification)")
+st.title("Legal Research AI Assistant")
+st.caption(
+    "AI-assisted legal research powered by retrieval, "
+    "contextual analysis, and web-based verification."
+)
 
 with st.sidebar:
-    st.header("⚙️ Settings")
-    
+    st.header("Configuration")
+
     VECTOR_STORE_ID = st.text_input(
         "Vector Store ID",
         value=VECTOR_STORE_ID,
-        type="default",
-        help="Your OpenAI vector store ID for legal documents"
+        help="OpenAI vector store containing the legal documents.",
     )
-    
-    st.info("ℹ️ Verification via MCP web search is always ON.")
-    
+
+    st.info("Web-based verification is enabled for every analysis.")
+
     st.divider()
-    
-    with st.expander("ℹ️ About"):
+
+    with st.expander("About this application"):
         st.markdown("""
-        This app uses a multi-agent system:
-        1. **Retrieval Agent**: Finds relevant case documents
-        2. **Formulation Agent**: Analyzes and structures response
-        3. **Verification Agent**: Fact-checks with live web search
+        This application uses a multi-agent research workflow:
+
+        1. **Retrieval Agent** — Retrieves relevant legal documents.
+        2. **Formulation Agent** — Develops a structured,
+           context-grounded answer.
+        3. **Verification Agent** — Cross-checks the answer
+           using web search.
         """)
 
+st.subheader("Research Query")
+
 query = st.text_area(
-    "📝 Enter your legal research question:",
+    "Enter your legal question",
     height=120,
-    placeholder="e.g., What was the court's ruling in the Wikimedia case?",
-    help="Ask any question about Indian Supreme Court cases in your database"
+    placeholder=(
+        "e.g., What was the court's ruling in the Wikimedia case?"
+    ),
+    help=(
+        "Ask a question about Indian Supreme Court cases "
+        "available in your document collection."
+    ),
 )
 
-st.markdown("---")
+col1, col2 = st.columns(2)
 
-col1, col2, spacer = st.columns([2, 1, 1])
 with col1:
     run_btn = st.button(
-        "🚀 Run Analysis",
+        "Run Analysis",
         type="primary",
         use_container_width=True,
-        disabled=not query.strip(), 
-        help="Click to start the legal research pipeline"
+        disabled=not query.strip(),
     )
 
 with col2:
     clear_btn = st.button(
-        "🗑️ Clear All",
+        "Clear",
         use_container_width=True,
-        help="Clear the query and results"
     )
 
 if clear_btn:
@@ -179,34 +191,61 @@ if clear_btn:
 
 if run_btn:
     if not VECTOR_STORE_ID:
-        st.error("Please provide a valid VECTOR_STORE_ID in the sidebar before running.")
+        st.error(
+            "Please provide a valid Vector Store ID "
+            "in the sidebar before proceeding."
+        )
     elif not query.strip():
-        st.error("Please enter a query.")
+        st.warning("Please enter a legal research question.")
     else:
-            with st.spinner("🔍 Running retrieval, formulation, and verification..."):
-                retrieved_context, final_analysis = run_async(run_pipeline(query))
-            
-            with st.container():
-                st.subheader("📄 Retrieved Context")
-                st.markdown(format_retrieved_context(retrieved_context))
-                
-                with st.expander("🔧 Raw context (debug)"):
+        try:
+            with st.spinner(
+                "Processing your query through the research pipeline..."
+            ):
+                retrieved_context, final_analysis = run_async(
+                    run_pipeline(query)
+                )
+
+            st.divider()
+            st.header("Research Results")
+
+            with st.expander("Retrieved Legal Context"):
+                st.markdown(
+                    format_retrieved_context(retrieved_context)
+                )
+
+                with st.expander("View Raw Context"):
                     if isinstance(retrieved_context, (dict, list)):
-                        st.code(json.dumps(retrieved_context, indent=2), language="json")
+                        st.code(
+                            json.dumps(retrieved_context, indent=2),
+                            language="json",
+                        )
                     else:
                         st.code(str(retrieved_context))
-                
-                st.divider()
-                
-                with st.container():
-                    st.subheader("⚖️ Final Analysis")
-                    st.markdown(lra_to_markdown(final_analysis))
-                    
-                    with st.expander("🔧 Raw JSON (debug)"):
-                        if isinstance(final_analysis, BaseModel):
-                            st.code(final_analysis.model_dump_json(indent=2), language="json")
-                        else:
-                            try:
-                                st.code(json.dumps(final_analysis, indent=2), language="json")
-                            except Exception:
-                                st.code(str(final_analysis))
+
+            st.markdown("---")
+            st.subheader("Final Legal Analysis")
+            st.markdown(lra_to_markdown(final_analysis))
+
+            with st.expander("View Structured Output (JSON)"):
+                if isinstance(final_analysis, BaseModel):
+                    st.code(
+                        final_analysis.model_dump_json(indent=2),
+                        language="json",
+                    )
+                else:
+                    try:
+                        st.code(
+                            json.dumps(final_analysis, indent=2),
+                            language="json",
+                        )
+                    except (TypeError, ValueError):
+                        st.code(str(final_analysis))
+
+        except Exception as exc:
+            st.error(
+                "The research pipeline encountered an error. "
+                "Please check your configuration and try again."
+            )
+            with st.expander("Error details"):
+                st.code(str(exc))
