@@ -21,64 +21,78 @@ class LegalResearchAnswer(BaseModel):
     confidence_score: float = Field(..., description="A score from 0.0 to 1.0 indicating confidence in the answer based on the clarity and completeness of the retrieved documents.")
 
 
+
 def lra_to_markdown(lra) -> str:
-    """Convert a LegalResearchAnswer to beautifully formatted Markdown."""
+    """Format a LegalResearchAnswer as structured Markdown."""
     if hasattr(lra, "model_dump"):
-        d = lra.model_dump()
+        data = lra.model_dump()
     elif hasattr(lra, "dict"):
-        d = lra.dict()
+        data = lra.dict()
     elif isinstance(lra, dict):
-        d = lra
+        data = lra
     else:
-        return f"``````"
+        return "Unable to format the legal research response."
+    sections = [
+        ("Issue", "issue"),
+        ("Short Answer", "short_answer"),
+        ("Applicable Legal Rule", "rule"),
+        ("Analysis", "analysis"),
+        ("Conclusion", "conclusion"),
+    ]
+    md = ["# Legal Research Report"]
+    for heading, key in sections:
+        content = data.get(key)
+        if content:
+            md.append(f"## {heading}\n\n{str(content).strip()}")
 
-    md = []
-    
-    md.append(f"#### 📋 Issue\n{(d.get('issue') or '').strip()}")
-    md.append("---") 
-    
-    md.append(f"#### 💡 Short Answer\n{(d.get('short_answer') or '').strip()}")
-    md.append("---")
-    
-    md.append(f"#### ⚖️ Legal Rule\n{(d.get('rule') or '').strip()}")
-    md.append("---")
-    
-    md.append(f"#### 🔍 Analysis\n{(d.get('analysis') or '').strip()}")
-    md.append("---")
-    
-    md.append(f"#### ✅ Conclusion\n{(d.get('conclusion') or '').strip()}")
-    
-    cits = d.get("citations") or []
-    if isinstance(cits, list) and cits:
-        md.append("---")
-        md.append("#### 📚 Citations")
-        lines = []
-        for c in cits:
-            if hasattr(c, "model_dump"):
-                c = c.model_dump()
-            title = c.get("title") or "Source"
-            cite = c.get("citation") or ""
-            link = c.get("link") or ""
-            juris = c.get("jurisdiction") or ""
-            scc = "⭐ SCC" if c.get("SCC_citation") else ""
-            meta = " • ".join([b for b in [cite, juris, scc] if b])
+    citations = data.get("citations") or []
+    if citations:
+        md.append("## References")
+        citation_lines = []
+        for citation in citations:
+            if hasattr(citation, "model_dump"):
+                citation = citation.model_dump()
+            elif hasattr(citation, "dict"):
+                citation = citation.dict()
+            if not isinstance(citation, dict):
+                continue
+
+            title = citation.get("title") or "Untitled Source"
+            link = citation.get("link") or ""
+            citation_text = citation.get("citation") or ""
+            jurisdiction = citation.get("jurisdiction") or ""
+            metadata = [
+                value for value in (
+                    citation_text,
+                    jurisdiction,
+                    "SCC Citation" if citation.get("SCC_citation") else "",
+                )
+                if value
+            ]
             label = f"[{title}]({link})" if link else title
-            lines.append(f"- {label}{(' — ' + meta) if meta else ''}")
-        md.append("\n".join(lines))
+            line = f"- {label}"
+            if metadata:
+                line += f" — {' | '.join(metadata)}"
+            citation_lines.append(line)
+            
+        if citation_lines:
+            md.append("\n".join(citation_lines))
 
-    meta_items = []
-    if d.get("confidence_score") is not None:
-        score = float(d['confidence_score'])
-        emoji = "🟢" if score >= 0.8 else "🟡" if score >= 0.5 else "🔴"
-        meta_items.append(f"{emoji} **Confidence:** {score:.2f}")
-    if d.get("judgement"):
-        meta_items.append(f"⚖️ **Status:** {d['judgement']}")
-    
-    if meta_items:
-        md.append("---")
-        md.append(" • ".join(meta_items))
-    
-    return "\n\n".join(md)
+    metadata = []
+    confidence = data.get("confidence_score")
+    if confidence is not None:
+        try:
+            score = float(confidence)
+            metadata.append(f"**Confidence Score:** {score:.2f}")
+        except (TypeError, ValueError):
+            pass
+    judgement = data.get("judgement")
+    if judgement:
+        metadata.append(f"**Judgment Status:** {judgement}")
+    if metadata:
+        md.append("## Assessment\n\n" + "\n\n".join(metadata))
+
+    return "\n\n---\n\n".join(md)
 
 def format_retrieved_context(context) -> str:
     """Convert retrieved context to readable Markdown."""
